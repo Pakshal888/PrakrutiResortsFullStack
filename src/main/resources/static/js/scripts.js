@@ -22,15 +22,15 @@ const handleAvailabilityCheck = async (e) => {
     e.preventDefault(); // Stop the default HTML form submission
 
     // Clear any previous dynamic content
-    document.querySelectorAll('.availability__result_card, .availability__no_rooms, .guest__form__section').forEach(el => el.remove());
+    document.querySelectorAll('.availability__result_card, .availability__no_rooms, .guest__form__section, .room__availability').forEach(el => el.remove());
 
     const arrivalDate = document.getElementById('arrival').value;
     const departureDate = document.getElementById('departure').value;
     const numberOfGuests = parseInt(document.getElementById('guests').value); 
 
-    // Basic client-side validation
+    // Basic client-side validation - Using console.error instead of alert()
     if (!arrivalDate || !departureDate || numberOfGuests < 1 || new Date(arrivalDate) >= new Date(departureDate)) {
-        alert("Please select valid arrival/departure dates and number of guests.");
+        console.error("Validation Error: Please select valid arrival/departure dates and number of guests.");
         return;
     }
 
@@ -66,7 +66,7 @@ const handleAvailabilityCheck = async (e) => {
         }
     } catch (error) {
         console.error('Error fetching availability:', error);
-        displayNoRooms("A connection error occurred. Please ensure the backend server is running.");
+        displayNoRooms("A connection error occurred. Please ensure the backend server is running and the API is correct.");
     } finally {
         // Restore button state
         checkBtn.innerText = originalText;
@@ -89,8 +89,11 @@ const displayAvailableRooms = (rooms, arrival, departure, guests) => {
     const diffTime = Math.abs(new Date(departure) - new Date(arrival));
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
+    // Assign a unique ID to the section for scrolling
+    const sectionId = 'available-rooms-section';
+
     let roomsHtml = `
-        <section class="section__container room__availability" style="padding-top: 2rem;">
+        <section class="section__container room__availability" id="${sectionId}" style="padding-top: 2rem;">
             <h2 class="section__header" style="margin-bottom: 2rem;">
                 Available Rooms (${formatDateDisplay(arrival)} - ${formatDateDisplay(departure)})
             </h2>
@@ -163,6 +166,12 @@ const displayAvailableRooms = (rooms, arrival, departure, guests) => {
     `;
     bookingSection.insertAdjacentHTML('afterend', roomsHtml);
 
+    // --- NEW SCROLLING LOGIC: Scroll down to the newly displayed rooms ---
+    const newSection = document.getElementById(sectionId);
+    if (newSection) {
+        newSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     // Attach event listeners to the new 'Select Room' buttons
     document.querySelectorAll('.select-room-btn').forEach(button => {
         button.addEventListener('click', handleRoomSelection);
@@ -181,7 +190,11 @@ const handleRoomSelection = (e) => {
     const guests = btn.dataset.guests;
     
     // Hide availability results
-    document.querySelector('.room__availability').style.display = 'none';
+    const availabilitySection = document.querySelector('.room__availability');
+    if (availabilitySection) {
+        availabilitySection.style.display = 'none';
+    }
+
 
     // Populate the hidden form fields
     document.getElementById('form-room-id').value = roomId;
@@ -204,7 +217,47 @@ const handleRoomSelection = (e) => {
 };
 
 
-// --- 7. FINAL RESERVATION AND PAYMENT (/reserve) ---
+// --- NEW RAZORPAY INTEGRATION CODE ---
+
+// A separate function to handle opening the payment modal
+const initiateRazorpayCheckout = (orderId, keyId, amountInRupees, name, email) => {
+    const amountInPaise = Math.round(amountInRupees * 100);
+    const options = {
+        key: keyId, 
+        amount: amountInPaise, // amount in smallest currency unit (Paise)
+        currency: "INR",
+        name: "Prakruti Resorts Booking",
+        description: "Room Reservation Payment",
+        order_id: orderId, 
+        handler: function (response) {
+            // This function is executed by Razorpay on successful payment.
+            // It redirects the user to our server endpoint for verification.
+            window.location.href = `/api/payment/success?razorpay_order_id=${response.razorpay_order_id}&razorpay_payment_id=${response.razorpay_payment_id}&razorpay_signature=${response.razorpay_signature}`;
+        },
+        modal: {
+            ondismiss: function() { 
+                // Restore button state if the user closes the modal. Using console.warn()
+                console.warn("Payment was closed or cancelled by the user. Please try again.");
+                const submitButton = document.querySelector('#guest-details button');
+                submitButton.innerText = 'Confirm Reservation & Pay';
+                submitButton.disabled = false;
+            }
+        },
+        prefill: {
+            name: name,
+            email: email,
+            contact: '9999999999' // Placeholder contact number
+        },
+        theme: {
+            color: "#6B7280"
+        }
+    };
+    const rzp1 = new Razorpay(options);
+    rzp1.open();
+};
+
+
+// --- 7. FINAL RESERVATION AND PAYMENT (/reserve) - UPDATED FOR RAZORPAY FLOW ---
 
 const handleFinalReservation = async (e) => {
     e.preventDefault();
@@ -214,49 +267,102 @@ const handleFinalReservation = async (e) => {
         arrivalDate: document.getElementById('form-arrival-date').value,
         departureDate: document.getElementById('form-departure-date').value,
         numberOfGuests: parseInt(document.getElementById('form-guests').value),
-        price: parseFloat(document.getElementById('form-total-price').value), // Total Price
+        price: parseFloat(document.getElementById('form-total-price').value), // Total Price in Rupees
         name: document.getElementById('guest-name').value,
         email: document.getElementById('guest-email').value
     };
     
     const submitButton = document.querySelector('#guest-details button');
-    submitButton.innerText = 'Processing...';
+    submitButton.innerText = 'Processing Reservation...';
     submitButton.disabled = true;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/reserve`, {
+        // Step 1: Create a PENDING Booking in our own database
+        const reserveResponse = await fetch(`${API_BASE_URL}/reserve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(finalPayload),
         });
 
-        const data = await response.json();
+        const reservationData = await reserveResponse.json();
 
-        if (response.ok && data.bookingId) {
-            
-            alert(`Reservation successful! Your PENDING Booking ID is: ${data.bookingId}. 
-            Total Amount: ₹${data.amount.toFixed(2)}. 
-            \n(NOTE: This booking is PENDING in the database. The next real-world step is payment processing.)`);
-
-            // Clean up UI after success
-            document.getElementById('guest-details-form-section').remove();
-            bookingForm.reset();
-            bookingSection.scrollIntoView({ behavior: 'smooth' });
-            
-        } else {
-            alert(`Reservation failed. Please try again. Error: ${data.message || 'Server did not return a valid booking ID.'}`);
+        if (!reserveResponse.ok || !reservationData.bookingId) {
+            throw new Error(reservationData.message || 'Failed to create local reservation.');
         }
+
+        const bookingId = reservationData.bookingId;
+        const amountInRupees = reservationData.amount;
+        
+        // Step 2: Request a Razorpay Order ID from our Backend
+        const orderResponse = await fetch('/api/payment/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                bookingId: bookingId,
+                amount: amountInRupees 
+            }),
+        });
+
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok || !orderData.orderId) {
+            throw new Error(orderData.error || 'Failed to create Razorpay Order. Check backend logs.');
+        }
+        
+        // Step 3: Open the Razorpay Checkout Modal
+        initiateRazorpayCheckout(
+            orderData.orderId, 
+            orderData.razorpayKeyId, // Key ID from backend
+            amountInRupees, 
+            finalPayload.name, 
+            finalPayload.email 
+        );
+
     } catch (error) {
-        console.error('Final reservation error:', error);
-        alert("A critical error occurred during reservation. Please check server status.");
-    } finally {
+        console.error('Reservation/Payment process error:', error);
+        // Using console.error() instead of alert()
+        console.error(`UI Notification: An error occurred during payment processing: ${error.message}. Please check console.`); 
+        
         submitButton.innerText = 'Confirm Reservation & Pay';
         submitButton.disabled = false;
     }
 };
 
 
-// --- 8. EVENT LISTENERS ATTACHMENT ---
+// --- 8. DATE CONSTRAINTS & EVENT LISTENERS ATTACHMENT ---
+
+/**
+ * Sets up listeners to enforce that the arrival date cannot be in the past,
+ * and the departure date cannot be before the arrival date.
+ */
+const setupDateConstraints = () => {
+    const arrivalInput = document.getElementById('arrival');
+    const departureInput = document.getElementById('departure');
+
+    if (arrivalInput && departureInput) {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // 1. Set the minimum selectable date for Arrival (cannot be in the past)
+        arrivalInput.setAttribute('min', today);
+
+        // 2. Listener for Arrival Date change
+        arrivalInput.addEventListener('change', (e) => {
+            const selectedArrivalDate = e.target.value;
+            
+            // Set the minimum selectable date for Departure to be the selected arrival date
+            departureInput.setAttribute('min', selectedArrivalDate);
+            
+            // If the currently selected departure date becomes invalid, clear it
+            if (departureInput.value && new Date(departureInput.value) <= new Date(selectedArrivalDate)) {
+                departureInput.value = '';
+            }
+        });
+
+        // Set initial min constraint for departure in case arrival has a value on load
+        departureInput.setAttribute('min', arrivalInput.value || today);
+    }
+};
+
 
 // Listener for the initial check availability form
 bookingForm.addEventListener('submit', handleAvailabilityCheck);
@@ -267,3 +373,6 @@ document.addEventListener('submit', (e) => {
         handleFinalReservation(e);
     }
 });
+
+// Run the date constraint setup when the script loads
+setupDateConstraints();

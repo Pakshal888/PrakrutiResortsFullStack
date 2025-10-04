@@ -2,6 +2,6 @@
 public class HomeController {
     @GetMapping("/")
     public String home() {
-        return "index"; // maps to templates/index.html
+        return "index"; // Spring will render index.html
     }
 }

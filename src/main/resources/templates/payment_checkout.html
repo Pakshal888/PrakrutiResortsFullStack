@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proceed to Payment</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <style>
+        .payment__container {
+            max-width: 600px;
+            margin: 5rem auto;
+            padding: 3rem;
+            border: 1px solid var(--extra-light);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .payment__details h2 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        .payment__details p {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            margin-bottom: 2rem;
+        }
+        .amount {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin-bottom: 2rem;
+        }
+        .mock-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .mock-fail {
+            background-color: #e74c3c; /* Red color for failure */
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="payment__container">
+        <div class="payment__details">
+            <h2>Payment Gateway Simulation</h2>
+            <p>You are about to complete your booking for **Prakruti Resorts**.</p>
+        </div>
+
+        <div class="amount">
+            ₹<span th:text="${#numbers.formatDecimal(amountRupees, 0, 'COMMA', 2, 'POINT')}">100.00</span>
+        </div>
+
+        <p>Booking Reference ID: <strong th:text="${bookingId}">12345</strong></p>
+        <p style="margin-top: 1rem; color: #7f8c8d;">(Amount in Paise: <span th:text="${amountPaise}">10000</span>)</p>
+
+        <div class="mock-buttons">
+            <a th:href="@{/payment/success(bookingId=${bookingId})}" class="btn">
+                ✅ Complete Payment (Success)
+            </a>
+            
+            <a href="/" class="btn mock-fail">
+                ❌ Cancel / Fail Payment
+            </a>
+        </div>
+        
+        <p style="margin-top: 3rem; color: var(--text-light); font-size: 0.9rem;">
+            *This is a mock payment interface. Clicking 'Complete Payment' will finalize your booking status in the system.
+        </p>
+
+    </div>
+    
+</body>
+</html>
