@@ -23,21 +23,18 @@ public class BookingBackendApplication {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // ✅ Allow credentials such as cookies or authorization headers
         config.setAllowCredentials(true);
 
-        // ✅ Use explicit allowed origins (replace URL with your frontend’s Railway domain)
+        // ✅ Add your frontend’s Railway domain and localhost for dev
         config.setAllowedOrigins(List.of(
-                "https://prakrutiresorts-frontend.up.railway.app", // your deployed frontend
-                "http://localhost:5173", // local dev (Vite default)
-                "http://localhost:5500"  // optional if using Live Server
+            "https://prakrutiresorts-frontend.up.railway.app", // frontend deployed URL
+            "http://localhost:5173", // local frontend dev
+            "http://localhost:5500"  // optional for Live Server
         ));
 
-        // ✅ Allow all headers and methods
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
-        // ✅ Apply to all routes
         source.registerCorsConfiguration("/**", config);
 
         FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
