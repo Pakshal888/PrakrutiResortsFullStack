@@ -9,8 +9,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.core.Ordered;
 
-import java.util.List;
-
 @SpringBootApplication
 public class BookingBackendApplication {
 
@@ -23,21 +21,23 @@ public class BookingBackendApplication {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
+        // 1. Allow credentials (cookies, auth headers)
         config.setAllowCredentials(true);
-
-        // ✅ Add your frontend’s Railway domain and localhost for dev
-        config.setAllowedOrigins(List.of(
-            "https://prakrutiresorts-frontend.up.railway.app", // frontend deployed URL
-            "http://localhost:5173", // local frontend dev
-            "http://localhost:5500"  // optional for Live Server
-        ));
-
+        
+        // 2. Explicitly allow your deployed frontend domain
+        config.addAllowedOrigin("https://prakrutiresortsfullstack-production.up.railway.app");
+        
+        // 3. Keep the pattern for broader coverage (optional, but robust)
+        config.addAllowedOriginPattern("*"); 
+        
+        // 4. Allow all headers and methods
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
         source.registerCorsConfiguration("/**", config);
-
         FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
+        
+        // Ensure this filter runs first
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return bean;
     }
