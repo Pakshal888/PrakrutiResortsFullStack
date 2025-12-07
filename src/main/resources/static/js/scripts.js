@@ -2,10 +2,10 @@
 
 // --- 1. CONFIGURATION ---
 // FOR LOCAL
-// const API_BASE_URL = 'http://localhost:8080/api/bookings';
+const API_BASE_URL = 'http://localhost:8081/api/bookings';
 
 // ✅ CORRECTED: Use your live Railway backend URL
-const API_BASE_URL = 'https://prakrutiresortsfullstack-production.up.railway.app/api/bookings';
+//const API_BASE_URL = 'https://prakrutiresortsfullstack-production.up.railway.app/api/bookings';
 
 // --- 2. SELECTORS ---
 const bookingForm = document.querySelector('.booking form');

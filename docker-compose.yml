@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # -----------------------------------------------------
+  # 1. Spring Boot Application Service: booking-backend
+  # -----------------------------------------------------
+  app:
+    # Builds the image using the Dockerfile in the current directory
+    build: .
+    container_name: booking-backend
+    
+    # Maps the container port 8081 to the host port 8081
+    ports:
+      - "8081:8081"
+      
+    # FIX: Wait until the 'mysqldb' service is explicitly marked as 'healthy'
+    depends_on:
+      mysqldb:
+        condition: service_healthy
+      
+    # Environment variables for the Spring Boot application
+    environment:
+      # Database Connection Details
+      # IMPORTANT: Host is set to the service name 'mysqldb', not 'localhost'
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/prakrutiresorts?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: admin@123
+      
+      # FIX: Explicitly set Hibernate Dialect to prevent "Unable to determine Dialect" error
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+      
+      # Razorpay Credentials
+      RAZORPAY_KEY_ID: rzp_test_XXXXXXXXXXXXXXXXXXXX
+      RAZORPAY_KEY_SECRET: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      
+      # Other properties (Spring will automatically pick these up)
+      SPRING_APPLICATION_NAME: booking-backend
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: 'true'
+      
+    restart: on-failure
+
+  # -----------------------------------------------------
+  # 2. MySQL Database Service
+  # -----------------------------------------------------
+  mysqldb:
+    image: mysql:8.0
+    container_name: booking-mysql-db
+    
+    # *** FIX APPLIED HERE *** # Changed HOST port from 3306 to 3307 to avoid the "port already in use" error.
+    # The format is HOST_PORT:CONTAINER_PORT
+    ports:
+      - "3307:3306"
+      
+    environment:
+      # Database setup credentials
+      MYSQL_ROOT_PASSWORD: admin@123
+      MYSQL_DATABASE: prakrutiresorts
+      
+    # FIX: Health check to determine when the database is fully initialized and ready
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-padmin@123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      
+    # Use a named volume to ensure data persists across container restarts
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    restart: always
+
+# Define the named volume
+volumes:
+  mysql_data:
